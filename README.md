@@ -15,3 +15,6 @@ enabled for them. Entries are line-separated in the format `[name (lowercase)]
 users who won't be on the channel when it first joins.
 
 See `nimbot --help` for information on how to run it.
+
+### Dependencies
+[https://pypi.python.org/pypi/humanize](humanize >= v0.5.1)
