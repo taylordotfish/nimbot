@@ -17,9 +17,8 @@
 
 
 class Mention:
-    def __init__(self, message, sender, target, index, time):
+    def __init__(self, message, sender, index, time):
         self.message = message
         self.sender = sender
-        self.target = target
         self.index = index
         self.time = time

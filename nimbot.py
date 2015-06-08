@@ -112,7 +112,7 @@ class Nimbot(IrcBot):
         for name in self.names:
             if re.search(r"\b{0}\b".format(name), message):
                 self.mentions[name].append(Mention(
-                    message, nick, name, self.msg_index, datetime.now()))
+                    message, nickname, self.msg_index, datetime.now()))
                 mentioned[name] = True
 
         if mentioned:
@@ -125,7 +125,7 @@ class Nimbot(IrcBot):
                       not mentioned[mention.sender] or
                       any(self.msg_index - m.index < 40
                           for m in self.mentions[nick]
-                          if m.sender == mention.sender))
+                          if m.sender.lower() == mention.sender.lower()))
             if deliver:
                 self.deliver(nick, [mention])
         self.mentions[nick] = []
