@@ -131,9 +131,9 @@ class Nimbot(IrcBot):
                 self.deliver(nick, [mention])
         self.mentions[nick] = []
 
-    def on_join(self, nickname, channel):
+    def on_join(self, nickname, channel, is_self):
         nick = nickname.lower()
-        if nick == self.nickname.lower():
+        if is_self:
             return
         if nick not in self.names:
             self.names.append(nick)
