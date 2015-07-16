@@ -64,16 +64,11 @@ class Nimbot(IrcBot):
         self.read_prefs()
 
     def deliver(self, nickname, mentions):
-        delay = 0
-        if len(mentions) > 10:
-            delay = min((len(mentions) - 8) / 12, 1)
-
         for mention in mentions:
             message = "[{0}] <{1}> {2}".format(
                 naturaltime(mention.time), mention.sender, mention.message)
             self.send(nickname, message)
             print("[deliver -> {0}] {1}".format(nickname, message))
-            sleep(delay)
 
     def on_query(self, message, nickname):
         cmd = message.lower()
@@ -200,7 +195,7 @@ def main():
     bot.register(args["-n"])
 
     bot.join(args["<channel>"])
-    bot.listen_async(bot.save_event.set, async_events=True)
+    bot.listen_async(bot.save_event.set)
     bot.save_loop()
     print("Disconnected from server.")
 
