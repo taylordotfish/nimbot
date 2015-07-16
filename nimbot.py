@@ -27,10 +27,9 @@ from pyrcb import IrcBot
 from mention import Mention
 from docopt import docopt
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from humanize import naturaltime
 from threading import Event
-from time import sleep
 import os
 import re
 import sys
