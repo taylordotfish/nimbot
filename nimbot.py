@@ -110,7 +110,7 @@ class Nimbot(IrcBot):
         print("[{0}] <{1}> {2}".format(target, nickname, message))
 
         for name in self.names:
-            if re.search(r"\b{0}\b".format(name), message):
+            if re.search(r"\b{0}\b".format(name), message, re.I):
                 self.mentions[name].append(Mention(
                     message, nickname, self.msg_index, datetime.now()))
                 mentioned[name] = True
