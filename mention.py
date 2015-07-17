@@ -17,8 +17,9 @@
 
 
 class Mention:
-    def __init__(self, message, sender, index, time):
+    def __init__(self, message, sender, index, time, private=False):
         self.message = message
         self.sender = sender
         self.index = index
         self.time = time
+        self.private = private

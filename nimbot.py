@@ -45,6 +45,8 @@ Usage:
   clear    Clear all mail without reading.
   enable   Enable nimbot.
   disable  Disable nimbot.
+  send     Send a private message.
+           Syntax: send [nickname] [message]
 """
 
 
@@ -55,6 +57,7 @@ class Nimbot(IrcBot):
         self.names = []
 
         self.mentions = defaultdict(list)
+        self.private_mentions = defaultdict(list)
         self.enabled = defaultdict(lambda: True)
         self.save_event = Event()
 
@@ -64,13 +67,14 @@ class Nimbot(IrcBot):
 
     def deliver(self, nickname, mentions):
         for mention in mentions:
-            message = "[{0}] <{1}> {2}".format(
-                naturaltime(mention.time), mention.sender, mention.message)
+            message = "{3}[{0}] <{1}> {2}".format(
+                naturaltime(mention.time), mention.sender, mention.message,
+                "[private] " if mention.private else "")
             self.send(nickname, message)
             print("[deliver -> {0}] {1}".format(nickname, message))
 
     def on_query(self, message, nickname):
-        cmd = message.lower()
+        cmd = message.split(" ", 1)[0].lower()
         nick = nickname.lower()
         print("[query] <{0}> {1}".format(nickname, message))
 
@@ -82,9 +86,11 @@ class Nimbot(IrcBot):
         elif cmd == "check":
             if not self.enabled[nick]:
                 self.send(nick, "nimbot is disabled.")
-            elif self.mentions[nick]:
-                self.deliver(nick, self.mentions[nick])
+            elif self.mentions[nick] or self.private_mentions[nick]:
+                self.deliver(nick, (self.mentions[nick] +
+                                    self.private_mentions[nick]))
                 self.mentions[nick] = []
+                self.private_mentions[nick] = []
             else:
                 self.send(nick, "No new mail.")
         elif cmd == "clear":
@@ -96,8 +102,20 @@ class Nimbot(IrcBot):
                 self.mentions[nick] = []
                 self.save_event.set()
             self.send(nick, "nimbot {0}d.".format(cmd))
+        elif cmd == "send" and len(message.split(" ", 2)) == 3:
+            target, msg = message.split(" ", 2)[1:]
+            if not self.enabled[target]:
+                self.send(nick, "{0} has disabled nimbot.".format(target))
+            else:
+                self.private_mentions[target].append(Mention(
+                    msg, nickname, 0, datetime.now(), private=True))
+                self.send(nick, "Message sent.")
         else:
             self.send(nick, '"/msg {0} help" for help.'.format(self.nickname))
+
+        if self.mentions[nick] or self.private_mentions[nick]:
+            self.send(nick, 'You have unread messages. "/msg {0} check" '
+                            'to read.'.format(self.nickname))
 
     def on_message(self, message, nickname, target, is_query):
         if is_query:
@@ -110,7 +128,7 @@ class Nimbot(IrcBot):
         print("[{0}] <{1}> {2}".format(target, nickname, message))
 
         for name in self.names:
-            if re.search(r"\(^|\s){0}($|\s)".format(
+            if re.search(r"(^|\W){0}($|\W)".format(
                     re.escape(name)), message, re.I):
                 self.mentions[name].append(Mention(
                     message, nickname, self.msg_index, datetime.now()))
@@ -129,7 +147,9 @@ class Nimbot(IrcBot):
                           if m.sender.lower() == mention.sender.lower()))
             if deliver:
                 self.deliver(nick, [mention])
+        self.deliver(nick, self.private_mentions[nick])
         self.mentions[nick] = []
+        self.private_mentions[nick] = []
 
     def on_join(self, nickname, channel, is_self):
         nick = nickname.lower()
