@@ -8,13 +8,20 @@ through private queries, and it can be enabled or disabled on a per-user basis.
 (enable|disable)`. It is enabled by default for all users. For more information
 on how to use nimbot, `/msg nimbot help`.
 
-`nimbot` will create a file named `prefs` when run. This file contains a list
-of users who have ever been on the IRC channel and whether or not `nimbot` is
-enabled for them. Entries are line-separated in the format `[name (lowercase)]
-[enabled (True/False)]`. Entries can be manually added to notify `nimbot` of
-users who won't be on the channel when it first joins.
+`nimbot` will create two files when terminated: `prefs` and `saved_mentions`.
+
+`prefs` contains a list of users who have ever been on the IRC channel and
+whether or not `nimbot` is enabled for them. Entries are line-separated in the
+format `[name (lowercase)] [enabled (True/False)]`. Entries can be manually
+added to notify `nimbot` of users who won't be on the channel when it first
+joins.
+
+`saved_mentions` contains a list of messages which have not yet been delivered.
+`nimbot` will read from this file when starting up, so undelivered messages
+won't be lost when restarting.
 
 See `nimbot --help` for information on how to run it.
 
 ### Dependencies
-[humanize >= v0.5.1](https://pypi.python.org/pypi/humanize)
+* Python 3.2 or higher
+* [humanize 0.5.1 or higher](https://pypi.python.org/pypi/humanize)

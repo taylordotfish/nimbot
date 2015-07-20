@@ -21,7 +21,7 @@ Usage:
 
 Options:
   -i --identify  Identify with NickServ. Accepts a password through stdin.
-  -n nick        The nickname to use [default: nimbot].
+  -n <nick>      The nickname to use [default: nimbot].
 """
 from pyrcb import IrcBot
 from mention import Mention
@@ -29,10 +29,10 @@ from docopt import docopt
 from collections import defaultdict
 from datetime import datetime
 from humanize import naturaltime
-from threading import Event
 import os
 import re
 import sys
+import threading
 
 # If modified, replace the source URL with one to the modified version.
 help_message = """\
@@ -53,17 +53,19 @@ Usage:
 class Nimbot(IrcBot):
     def __init__(self):
         super(Nimbot, self).__init__()
-        self.msg_index = -1
+        self.msg_index = 0
         self.names = []
 
         self.mentions = defaultdict(list)
         self.private_mentions = defaultdict(list)
         self.enabled = defaultdict(lambda: True)
-        self.save_event = Event()
 
         self.script_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
         self.prefs_path = os.path.join(self.script_dir, "prefs")
+        self.mentions_path = os.path.join(self.script_dir, "saved_mentions")
+
         self.read_prefs()
+        self.read_mentions()
 
     def deliver(self, nickname, mentions):
         for mention in mentions:
@@ -100,7 +102,6 @@ class Nimbot(IrcBot):
             if self.enabled[nick] != (cmd == "enable"):
                 self.enabled[nick] = (cmd == "enable")
                 self.mentions[nick] = []
-                self.save_event.set()
             self.send(nick, "nimbot {0}d.".format(cmd))
         elif cmd == "send" and len(message.split(" ", 2)) == 3:
             target, msg = message.split(" ", 2)[1:]
@@ -108,7 +109,7 @@ class Nimbot(IrcBot):
                 self.send(nick, "{0} has disabled nimbot.".format(target))
             else:
                 self.private_mentions[target].append(Mention(
-                    msg, nickname, 0, datetime.now(), private=True))
+                    msg, nickname, target, 0, datetime.now(), private=True))
                 self.send(nick, "Message sent.")
         else:
             self.send(nick, '"/msg {0} help" for help.'.format(self.nickname))
@@ -131,7 +132,7 @@ class Nimbot(IrcBot):
             if re.search(r"(^|\W){0}($|\W)".format(
                     re.escape(name)), message, re.I):
                 self.mentions[name].append(Mention(
-                    message, nickname, self.msg_index, datetime.now()))
+                    message, nickname, name, self.msg_index, datetime.now()))
                 mentioned[name] = True
 
         if mentioned:
@@ -147,6 +148,7 @@ class Nimbot(IrcBot):
                           if m.sender.lower() == mention.sender.lower()))
             if deliver:
                 self.deliver(nick, [mention])
+
         self.deliver(nick, self.private_mentions[nick])
         self.mentions[nick] = []
         self.private_mentions[nick] = []
@@ -157,7 +159,6 @@ class Nimbot(IrcBot):
             return
         if nick not in self.names:
             self.names.append(nick)
-            self.save_event.set()
             return
         if self.enabled[nick]:
             self.deliver(nick, self.mentions[nick])
@@ -171,37 +172,64 @@ class Nimbot(IrcBot):
         if new_nick not in self.names:
             self.names.append(new_nick)
             self.enabled[new_nick] = self.enabled[nick]
-            self.save_event.set()
 
     def on_names(self, channel, names):
         for name in [n.lower() for n in names]:
             if name not in self.names and name != self.nickname.lower():
                 self.names.append(name)
-                self.save_event.set()
 
-    def read_prefs(self):
-        if not os.path.isfile(self.prefs_path):
-            open(self.prefs_path, "w").close()
-            return
+    def print_prefs(self, file=sys.stdout):
+        for name in self.names:
+            print(name, self.enabled[name], file=file)
 
-        with open(self.prefs_path) as f:
-            for line in f:
-                if not line.startswith("#"):
-                    name = line.split()[0]
-                    self.names.append(name)
-                    self.enabled[name] = line.split()[1] == "True"
+    def print_mentions(self, file=sys.stdout):
+        for mentions in self.mentions.values():
+            for m in mentions:
+                print(m.to_string(self.msg_index), file=file)
+        for mentions in self.private_mentions.values():
+            for m in mentions:
+                print(m.to_string(), file=file)
 
     def save_prefs(self):
         with open(self.prefs_path, "w") as f:
             print("# [name (lowercase)] [enabled (True/False)]", file=f)
-            for name in self.names:
-                print(name, self.enabled[name], file=f)
+            self.print_prefs(file=f)
 
-    def save_loop(self):
-        while self.is_alive():
-            self.save_event.clear()
-            self.save_event.wait()
-            self.save_prefs()
+    def save_mentions(self):
+        with open(self.mentions_path, "w") as f:
+            self.print_mentions(file=f)
+
+    def read_prefs(self):
+        if not os.path.isfile(self.prefs_path):
+            return
+        with open(self.prefs_path) as f:
+            for line in f:
+                if not line.startswith("#"):
+                    name, enabled = line.rstrip().split(" ", 1)
+                    self.names.append(name)
+                    self.enabled[name] = enabled == "True"
+
+    def read_mentions(self):
+        if not os.path.isfile(self.mentions_path):
+            return
+        with open(self.mentions_path) as f:
+            for line in f:
+                m = Mention.from_string(line)
+                if not m.private:
+                    self.mentions[m.target].append(m)
+                else:
+                    self.private_mentions[m.target].append(m)
+
+
+def command_loop(bot):
+    while True:
+        line = input()
+        if line == "prefs":
+            bot.print_prefs()
+        elif line == "mentions":
+            bot.print_mentions()
+        else:
+            print('Unknown command. Type "prefs" or "mentions".')
 
 
 def main():
@@ -212,11 +240,21 @@ def main():
     if args["--identify"]:
         print("Password: ", end="", file=sys.stderr)
         bot.password(input())
+        print("Received password.")
     bot.register(args["-n"])
-
     bot.join(args["<channel>"])
-    bot.listen_async(bot.save_event.set)
-    bot.save_loop()
+
+    t = threading.Thread(target=command_loop, args=[bot])
+    t.daemon = True
+    t.start()
+
+    try:
+        bot.listen()
+    except KeyboardInterrupt:
+        return
+    finally:
+        bot.save_prefs()
+        bot.save_mentions()
     print("Disconnected from server.")
 
 if __name__ == "__main__":
