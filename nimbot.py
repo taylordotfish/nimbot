@@ -78,7 +78,8 @@ class Nimbot(IrcBot):
     def on_query(self, message, nickname):
         cmd = message.split(" ", 1)[0].lower()
         nick = nickname.lower()
-        print("[query] <{0}> {1}".format(nickname, message))
+        print("[{2}] [query] <{0}> {1}".format(
+            nickname, message, datetime.now().replace(microsecond=0)))
 
         if cmd == "help":
             help_lines = help_message.format(
@@ -126,7 +127,8 @@ class Nimbot(IrcBot):
         self.msg_index += 1
         nick = nickname.lower()
         mentioned = defaultdict(bool)
-        print("[{0}] <{1}> {2}".format(target, nickname, message))
+        print("[{3}] [{0}] <{1}> {2}".format(
+            target, nickname, message, datetime.now().replace(microsecond=0)))
 
         for name in self.names:
             if re.search(r"(^|\W){0}($|\W)".format(
