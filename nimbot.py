@@ -240,7 +240,7 @@ def main():
     if args["--identify"]:
         print("Password: ", end="", file=sys.stderr)
         bot.password(input())
-        print("Received password.")
+        print("Received password.", file=sys.stderr)
     bot.register(args["-n"])
     bot.join(args["<channel>"])
 
