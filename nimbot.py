@@ -42,7 +42,7 @@ nimbot is {0}.
 Usage:
   help     Show this help message.
   check    Manually check for mail.
-  clear    Clear all mail without reading.
+  clear    Clear all non-private mail without reading.
   enable   Enable nimbot.
   disable  Disable nimbot.
   send     Send a private message.
@@ -90,8 +90,8 @@ class Nimbot(IrcBot):
             if not self.enabled[nick]:
                 self.send(nick, "nimbot is disabled.")
             elif self.mentions[nick] or self.private_mentions[nick]:
-                self.deliver(nick, (self.mentions[nick] +
-                                    self.private_mentions[nick]))
+                self.deliver(nick, self.mentions[nick])
+                self.deliver(nick, self.private_mentions[nick])
                 self.mentions[nick] = []
                 self.private_mentions[nick] = []
             else:
