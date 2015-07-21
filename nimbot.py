@@ -134,6 +134,8 @@ class Nimbot(IrcBot):
             target, nickname, message, datetime.now().replace(microsecond=0)))
 
         for name in self.names:
+            if not self.enabled[name]:
+                continue
             if re.match(r"({0}[:, ]|(\w+[:,] ?)+{0}[:,])".format(
                     re.escape(name)), message, re.I):
                 self.mentions[name].append(Mention(
@@ -146,12 +148,12 @@ class Nimbot(IrcBot):
             return
 
         for mention in self.mentions[nick]:
-            deliver = self.msg_index - mention.index > 50 and (
-                      not mentioned[mention.sender] or
-                      any(self.msg_index - m.index < 40
-                          for m in self.mentions[nick]
-                          if m.sender.lower() == mention.sender.lower()))
-            if deliver:
+            old_message = self.msg_index - mention.index > 50
+            is_reply = mentioned[mention.sender]
+            new_msg_exists = any(self.msg_index - m.index < 40 and
+                                 m.sender.lower() == mention.sender.lower()
+                                 for m in self.mentions[nick])
+            if old_message and (not is_reply or new_msg_exists):
                 self.deliver(nick, [mention])
 
         self.deliver(nick, self.private_mentions[nick])
