@@ -134,7 +134,7 @@ class Nimbot(IrcBot):
             target, nickname, message, datetime.now().replace(microsecond=0)))
 
         for name in self.names:
-            if not self.enabled[name]:
+            if not self.enabled[name] or name == nick:
                 continue
             if re.match(r"({0}[:, ]|(\w+[:,] ?)+{0}[:,])".format(
                     re.escape(name)), message, re.I):
