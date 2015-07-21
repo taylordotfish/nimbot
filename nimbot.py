@@ -136,7 +136,7 @@ class Nimbot(IrcBot):
         for name in self.names:
             if not self.enabled[name] or name == nick:
                 continue
-            if re.match(r"(\W+{0}\W|(\w+[:,] ?)+{0}[:])".format(
+            if re.match(r"(\W*{0}\W|(\w+[:,] ?)+{0}[:])".format(
                     re.escape(name)), message, re.I):
                 self.mentions[name].append(Mention(
                     message, nickname, name, self.msg_index, datetime.now()))
