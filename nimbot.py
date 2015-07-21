@@ -136,7 +136,7 @@ class Nimbot(IrcBot):
         for name in self.names:
             if not self.enabled[name] or name == nick:
                 continue
-            if re.match(r"({0}[:, ]|(\w+[:,] ?)+{0}[:,])".format(
+            if re.match(r"(\W+{0}\W|(\w+[:,] ?)+{0}[:])".format(
                     re.escape(name)), message, re.I):
                 self.mentions[name].append(Mention(
                     message, nickname, name, self.msg_index, datetime.now()))
@@ -232,11 +232,12 @@ def command_loop(bot):
     while True:
         line = input()
         if line == "prefs":
-            bot.print_prefs()
+            bot.print_prefs(file=sys.stderr)
         elif line == "mentions":
-            bot.print_mentions()
+            bot.print_mentions(file=sys.stderr)
         else:
-            print('Unknown command. Type "prefs" or "mentions".')
+            print('Unknown command. Type "prefs" or "mentions".',
+                  file=sys.stderr)
 
 
 def main():
