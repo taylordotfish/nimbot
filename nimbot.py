@@ -38,6 +38,8 @@ import threading
 help_message = """\
 nimbot: The non-intrusive mailbot.
 Source: https://github.com/nickolas360/nimbot (AGPLv3 or later)
+To send mail, begin your message with "[nickname]:".
+You can specify multiple nicknames, separated by commas or colons.
 nimbot is {0}.
 Usage:
   help     Show this help message.
@@ -69,9 +71,10 @@ class Nimbot(IrcBot):
 
     def deliver(self, nickname, mentions):
         for mention in mentions:
-            message = "{3}[{0}] <{1}> {2}".format(
-                naturaltime(mention.time), mention.sender, mention.message,
-                "[private] " if mention.private else "")
+            message = "[{0}] <{1}> {2}".format(
+                naturaltime(mention.time), mention.sender, mention.message)
+            if mention.private:
+                message = "[private] " + message
             self.send(nickname, message)
             print("[deliver -> {0}] {1}".format(nickname, message))
 
@@ -131,7 +134,7 @@ class Nimbot(IrcBot):
             target, nickname, message, datetime.now().replace(microsecond=0)))
 
         for name in self.names:
-            if re.search(r"(^|\W){0}($|\W)".format(
+            if re.match(r"({0}[:, ]|(\w+[:,] ?)+{0}[:,])".format(
                     re.escape(name)), message, re.I):
                 self.mentions[name].append(Mention(
                     message, nickname, name, self.msg_index, datetime.now()))
