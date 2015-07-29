@@ -17,11 +17,13 @@
 # along with nimbot.  If not, see <http://www.gnu.org/licenses/>.
 """
 Usage:
-  nimbot <host> <port> <channel> [-i] [-n nick]
+  nimbot <host> <port> <channel> [options]
+  nimbot -h | --help
 
 Options:
+  -h --help      Display this help message.
   -i --identify  Identify with NickServ. Accepts a password through stdin.
-  -n <nick>      The nickname to use [default: nimbot].
+  -n NICKNAME    The nickname to use [default: nimbot].
 """
 from pyrcb import IrcBot
 from mention import Mention
