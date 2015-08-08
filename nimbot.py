@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Copyright (C) 2015 taylor.fish (https://github.com/taylordotfish)
+# Copyright (C) 2015 nc Krantz-Fire (https://pineco.net/)
 #
 # This file is part of nimbot.
 #
