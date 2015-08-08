@@ -55,3 +55,7 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# Config files
+prefs
+saved_mentions
