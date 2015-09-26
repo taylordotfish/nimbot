@@ -1,4 +1,6 @@
-# nimbot
+nimbot
+======
+
 Version 0.1.0
 
 **nimbot** is a Non-Intrusive Mailbot for IRC. It notifies users when they're
@@ -30,7 +32,9 @@ be lost when restarting.
 
 See `nimbot --help` for information on how to run it.
 
-### Dependencies
+Dependencies
+------------
+
 * Python 3.3 or higher
 * [docopt 0.6.6 or higher](https://pypi.python.org/pypi/docopt)
 * [humanize 0.5.1 or higher](https://pypi.python.org/pypi/humanize)
