@@ -19,29 +19,39 @@
 # along with nimbot.  If not, see <http://www.gnu.org/licenses/>.
 """
 Usage:
-  nimbot <host> <port> <channel> [options]
-  nimbot -h | --help
+  nimbot [options] <host> <port> <channel>
+  nimbot -h | --help | --version
 
 Options:
-  -h --help      Display this help message.
-  -i --identify  Identify with NickServ. Accepts a password through stdin.
-  -n NICKNAME    The nickname to use [default: nimbot].
+  -n <nickname>    The nickname to use [default: nimbot].
+  --check-id       Force users registered with NickServ to be identified.
+                   Server must support account-notify.
+  --force-id       Force all users to be identified with NickServ.
+                   Server must support account-notify.
+  --password       Set a connection password. Can be used to identify
+                   with NickServ. Uses getpass() if stdin is a TTY.
+  --getpass        Force password to be read with getpass().
+  --ssl            Use SSL/TLS to connect to the IRC server.
+  --cafile=<file>  Use the specified list of CA root certificates to
+                   verify the IRC server's certificate.
 """
-from pyrcb import IrcBot
+from pyrcb import IRCBot, IStr
 from mention import Mention
+from user import User, Users
 from docopt import docopt
-from collections import defaultdict
+from humanize import naturaltime
 from datetime import datetime
 from getpass import getpass
-from humanize import naturaltime
 import os
 import re
 import sys
 import threading
 
+__version__ = "0.1.0"
+
 # If modified, replace the source URL with one to the modified version.
 help_message = """\
-nimbot: The non-intrusive mailbot.
+nimbot: The Non-Intrusive Mailbot.
 Source: https://github.com/taylordotfish/nimbot (AGPLv3 or later)
 To send mail, begin your message with "[nickname]:".
 You can specify multiple nicknames, separated by commas or colons.
@@ -49,29 +59,30 @@ nimbot is {0}.
 Usage:
   help     Show this help message.
   check    Manually check for mail.
-  clear    Clear all non-private mail without reading.
+  clear    Clear mail without reading.
   enable   Enable nimbot.
-  disable  Disable nimbot.
+  disable  Disable nimbot. You'll still receive private
+           messages sent when you're offline.
   send     Send a private message.
-           Syntax: send [nickname] [message]
+           Usage: send <nickname> <message>
 """
 
+script_dir = os.path.dirname(os.path.realpath(__file__))
+users_path = os.path.join(script_dir, "saved-users")
+mentions_path = os.path.join(script_dir, "saved-mentions")
 
-class Nimbot(IrcBot):
-    def __init__(self):
-        super(Nimbot, self).__init__()
+
+class Nimbot(IRCBot):
+    def __init__(self, check_id, force_id, **kwargs):
+        super(Nimbot, self).__init__(**kwargs)
+        self.check_id = check_id
+        self.force_id = force_id
         self.msg_index = 0
-        self.names = []
+        self.users = Users()
 
-        self.mentions = defaultdict(list)
-        self.private_mentions = defaultdict(list)
-        self.enabled = defaultdict(lambda: True)
-
-        self.script_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
-        self.prefs_path = os.path.join(self.script_dir, "prefs")
-        self.mentions_path = os.path.join(self.script_dir, "saved_mentions")
-
-        self.read_prefs()
+        self.use_acc = True
+        self.use_status = True
+        self.read_users()
         self.read_mentions()
 
     def deliver(self, nickname, mentions):
@@ -84,188 +95,282 @@ class Nimbot(IrcBot):
             print("[deliver -> {0}] {1}".format(nickname, message))
 
     def on_query(self, message, nickname):
-        cmd = message.split(" ", 1)[0].lower()
-        nick = nickname.lower()
+        def help():
+            response = help_message.format(
+                ["disabled", "enabled"][user.enabled])
+            for line in response.splitlines():
+                self.send(nickname, line)
+
+        def check():
+            if not user.enabled:
+                self.send(nickname, "nimbot is disabled.")
+            elif user.mentions:
+                self.deliver(nickname, user.mentions)
+                user.clear_mentions()
+            else:
+                self.send(nickname, "No new mail.")
+
+        def clear():
+            user.clear_mentions()
+            self.send(nickname, "Mail cleared.")
+
+        def enable():
+            user.enabled = True
+            self.send(nickname, "nimbot enabled.")
+
+        def disable():
+            user.clear_mentions()
+            user.enabled = False
+            self.send(nickname, "nimbot disabled.")
+
+        def send():
+            args = message.split(" ", 2)[1:]
+            if len(args) < 2:
+                other()
+                return
+
+            target_nick, msg = args
+            if target_nick not in self.users:
+                self.send(nickname, "You can only send private messages "
+                                    "to users nimbot is aware of.")
+            elif target_nick in self.nicklist[self.channels[0]]:
+                self.send(nickname, "{0} is online. Send them a regular "
+                                    "private message.".format(target_nick))
+            else:
+                target = self.users[target_nick]
+                target.mentions.append(Mention(
+                    msg, user, target, 0, datetime.now(), private=True))
+                self.send(nickname, "Message sent.")
+
+        def other():
+            self.send(nickname, 'Type "help" for help.')
+
+        command = IStr(message.split(" ", 1)[0])
+        user = self.users[nickname]
         print("[{2}] [query] <{0}> {1}".format(
             nickname, message, datetime.now().replace(microsecond=0)))
 
-        if cmd == "help":
-            help_lines = help_message.format(
-                ["disabled", "enabled"][self.enabled[nick]]).splitlines()
-            for line in help_lines:
-                self.send(nick, line)
-        elif cmd == "check":
-            if not self.enabled[nick]:
-                self.send(nick, "nimbot is disabled.")
-            elif self.mentions[nick] or self.private_mentions[nick]:
-                self.deliver(nick, self.mentions[nick])
-                self.deliver(nick, self.private_mentions[nick])
-                self.mentions[nick] = []
-                self.private_mentions[nick] = []
-            else:
-                self.send(nick, "No new mail.")
-        elif cmd == "clear":
-            self.mentions[nick] = []
-            self.send(nick, "Mail cleared.")
-        elif cmd == "enable" or cmd == "disable":
-            if self.enabled[nick] != (cmd == "enable"):
-                self.enabled[nick] = (cmd == "enable")
-                self.mentions[nick] = []
-            self.send(nick, "nimbot {0}d.".format(cmd))
-        elif cmd == "send" and len(message.split(" ", 2)) == 3:
-            target, msg = message.split(" ", 2)[1:]
-            if not self.enabled[target]:
-                self.send(nick, "{0} has disabled nimbot.".format(target))
-            else:
-                self.private_mentions[target].append(Mention(
-                    msg, nickname, target, 0, datetime.now(), private=True))
-                self.send(nick, "Message sent.")
+        # Dispatch command to the appropriate function,
+        # or other() if not found.
+        function = {
+            "help": help, "check": check, "clear": clear,
+            "enable": enable, "disable": disable, "send": send
+        }.get(command, other)
+
+        if nickname not in self.nicklist[self.channels[0]]:
+            self.send(nickname, "Please join the channel monitored "
+                                "by nimbot first.")
+        elif user.id_pending:
+            self.send(nickname, "Your nickname is being identified. "
+                                "Please try again in a few seconds.")
+        elif not user.identified:
+            self.send(nickname, "Please identify with NickServ to use nimbot.")
         else:
-            self.send(nick, '"/msg {0} help" for help.'.format(self.nickname))
+            function()
+            if user.mentions:
+                self.send(nickname, "You have unread messages. "
+                                    'Type "check" to read.')
 
-        if self.mentions[nick] or self.private_mentions[nick]:
-            self.send(nick, 'You have unread messages. "/msg {0} check" '
-                            'to read.'.format(self.nickname))
-
-    def on_message(self, message, nickname, target, is_query):
+    def on_message(self, message, nickname, channel, is_query):
         if is_query:
             self.on_query(message, nickname)
             return
 
+        sender = self.users[nickname]
         self.msg_index += 1
-        nick = nickname.lower()
-        mentioned = defaultdict(bool)
+        mentioned = []
         print("[{3}] [{0}] <{1}> {2}".format(
-            target, nickname, message, datetime.now().replace(microsecond=0)))
+            channel, nickname, message, datetime.now().replace(microsecond=0)))
 
-        for name in self.names:
-            if not self.enabled[name] or name == nick:
+        for user in self.users.values():
+            if not user.enabled or user == sender:
                 continue
-            if re.match(r"(\W*{0}\W|([a-z0-9\\\-[\]{{}}_^`]+[:,] ?)+{0}\W)"
-                        .format(re.escape(name)), message, re.I):
-                self.mentions[name].append(Mention(
-                    message, nickname, name, self.msg_index, datetime.now()))
-                mentioned[name] = True
+            # Check if user is mentioned.
+            is_mentioned = re.match(r"([^:, ]+[:,] ?)*{0}[:,]".format(
+                re.escape(user.nickname)), message, re.I)
+            if is_mentioned:
+                user.mentions.append(Mention(
+                    message, sender, user, self.msg_index, datetime.now()))
+                mentioned.append(user)
 
         if mentioned:
-            print("[mentioned] {0}".format(", ".join(mentioned)))
-        if not self.enabled[nick]:
+            print("[mentioned] {0}".format(", ".join(map(str, mentioned))))
+        if not sender.enabled:
             return
 
-        for mention in self.mentions[nick]:
-            old_message = self.msg_index - mention.index > 50
-            is_reply = mentioned[mention.sender]
+        mentions = []
+        for mention in sender.mentions:
+            is_old = self.msg_index - mention.index > 50
+            has_reply = mention.sender in mentioned
             new_msg_exists = any(self.msg_index - m.index < 40 and
-                                 m.sender.lower() == mention.sender.lower()
-                                 for m in self.mentions[nick])
-            if old_message and (not is_reply or new_msg_exists):
-                self.deliver(nick, [mention])
+                                 m.sender == mention.sender
+                                 for m in sender.mentions)
+            if is_old and (not has_reply or new_msg_exists):
+                mentions.append(mention)
 
-        self.deliver(nick, self.private_mentions[nick])
-        self.mentions[nick] = []
-        self.private_mentions[nick] = []
+        self.deliver(nickname, mentions)
+        sender.clear_mentions()
 
-    def on_join(self, nickname, channel, is_self):
-        nick = nickname.lower()
-        if is_self:
+    def on_join(self, nickname, channel):
+        if nickname == self.nickname:
             return
-        if nick not in self.names:
-            self.names.append(nick)
-            return
-        if self.enabled[nick]:
-            self.deliver(nick, self.mentions[nick])
-            self.mentions[nick] = []
+        self.users[nickname]
+        self.identify(nickname)
 
-    def on_nick(self, nickname, new_nickname, is_self):
-        if is_self:
-            return
-        nick = nickname.lower()
-        new_nick = new_nickname.lower()
-        if new_nick not in self.names:
-            self.names.append(new_nick)
-            self.enabled[new_nick] = self.enabled[nick]
+    def on_nick(self, nickname, new_nickname):
+        user = self.users[new_nickname]
+        user.enabled = self.users[nickname].enabled
+        self.identify(new_nickname)
 
     def on_names(self, channel, names):
-        for name in [n.lower() for n in names]:
-            if name not in self.names and name != self.nickname.lower():
-                self.names.append(name)
+        for name in names:
+            if name != self.nickname:
+                user = self.users[name]
+                user.deliver_on_id = False
+                self.identify(name)
 
-    def print_prefs(self, file=sys.stdout):
-        for name in self.names:
-            print(name, self.enabled[name], file=file)
+    # ===================
+    # User identification
+    # ===================
 
-    def print_mentions(self, file=sys.stdout):
-        for mentions in self.mentions.values():
-            for m in mentions:
-                print(m.to_string(self.msg_index), file=file)
-        for mentions in self.private_mentions.values():
-            for m in mentions:
-                print(m.to_string(), file=file)
+    def identify(self, nickname):
+        user = self.users[nickname]
+        if self.check_id or self.force_id:
+            user.id_pending = True
+            user.identified = False
+            print("Identifying {0}...".format(nickname))
+            if self.use_acc:
+                self.send("NickServ", "ACC {0} {0}".format(nickname))
+            if self.use_status:
+                self.send("NickServ", "STATUS {0}".format(nickname))
+        else:
+            user.identified = True
+            self.on_identified(user)
 
-    def save_prefs(self):
-        with open(self.prefs_path, "w") as f:
-            print("# [name (lowercase)] [enabled (True/False)]", file=f)
-            self.print_prefs(file=f)
+    def on_identified(self, user):
+        user.valid = True
+        if user.enabled and user.deliver_on_id:
+            self.deliver(user.nickname, user.mentions)
+            user.clear_mentions()
+
+    def on_notice(self, message, nickname, channel, is_query):
+        if nickname != "NickServ":
+            return
+
+        match = None
+        if self.use_acc:
+            match = re.match("([^ ]*) -> [^ ]* ACC (\d)", message)
+            if match:
+                self.use_status = False
+                nick, status = match.groups()
+
+        if self.use_status:
+            match = re.match("STATUS ([^ ]*) (\d) ([^ ]*)", message)
+            if match:
+                self.use_acc = False
+                nick, status, account = match.groups()
+                if status == "3" and nick != account:
+                    status = "1"
+
+        if match:
+            user = self.users[nick]
+            user.identified = (
+                status == "3" or status == "0" and not self.force_id)
+            user.id_pending = False
+
+            id_str = "identified" if user.identified else "not identified"
+            print("{0} {1}. (ACC/STATUS {2})".format(nick, id_str, status))
+            if user.identified:
+                self.on_identified(user)
+            user.deliver_on_id = True
+
+    def on_raw(self, nickname, command, args):
+        if command == "ACCOUNT":
+            print("Account status for {0} changed.".format(nickname))
+            self.identify(nickname)
+
+    # ===========
+    # Preferences
+    # ===========
+
+    def print_users(self, file=sys.stderr):
+        users = (u for u in self.users.values() if u.valid)
+        for user in users:
+            print(user.to_string(), file=file)
+
+    def print_mentions(self, file=sys.stderr):
+        users = (u for u in self.users.values() if u.valid)
+        mentions = (m for u in users for m in u.mentions)
+        for mention in mentions:
+            offset = 0 if mention.private else self.msg_index
+            print(mention.to_string(offset), file=file)
+
+    def save_users(self):
+        with open(users_path, "w") as f:
+            print("# <nickname> <enabled (True/False)>", file=f)
+            self.print_users(file=f)
 
     def save_mentions(self):
-        with open(self.mentions_path, "w") as f:
+        with open(mentions_path, "w") as f:
             self.print_mentions(file=f)
 
-    def read_prefs(self):
-        if not os.path.isfile(self.prefs_path):
+    def read_users(self):
+        if not os.path.isfile(users_path):
             return
-        with open(self.prefs_path) as f:
+        with open(users_path) as f:
             for line in f:
                 if not line.startswith("#"):
-                    name, enabled = line.rstrip().split(" ", 1)
-                    self.names.append(name)
-                    self.enabled[name] = enabled == "True"
+                    user = User.from_string(line.rstrip())
+                    self.users[user.nickname] = user
 
     def read_mentions(self):
-        if not os.path.isfile(self.mentions_path):
+        if not os.path.isfile(mentions_path):
             return
-        with open(self.mentions_path) as f:
+        with open(mentions_path) as f:
             for line in f:
-                m = Mention.from_string(line)
-                if not m.private:
-                    self.mentions[m.target].append(m)
-                else:
-                    self.private_mentions[m.target].append(m)
+                mention = Mention.from_string(line, self.users)
+                mention.target.mentions.append(mention)
 
 
 def command_loop(bot):
     while True:
-        line = input()
-        if line == "prefs":
-            bot.print_prefs(file=sys.stderr)
-        elif line == "mentions":
-            bot.print_mentions(file=sys.stderr)
+        command = input()
+        if command == "users":
+            bot.print_users()
+        elif command == "mentions":
+            bot.print_mentions()
         else:
-            print('Unknown command. Type "prefs" or "mentions".',
-                  file=sys.stderr)
+            print("Unknown command.", file=sys.stderr)
+            print('Type "users" or "mentions".', file=sys.stderr)
 
 
 def main():
-    args = docopt(__doc__)
-    bot = Nimbot()
-    bot.connect(args["<host>"], int(args["<port>"]))
+    args = docopt(__doc__, version=__version__)
+    bot = Nimbot(args["--check-id"], args["--force-id"])
+    bot.connect(args["<host>"], int(args["<port>"]), use_ssl=args["--ssl"],
+                ca_certs=args["--cafile"])
 
-    if args["--identify"]:
-        bot.password(getpass("Password: ", stream=sys.stderr))
-        print("Received password.", file=sys.stderr)
+    if args["--password"]:
+        print("Password: ", end="", file=sys.stderr, flush=True)
+        use_getpass = sys.stdin.isatty() or args["--getpass"]
+        bot.password(getpass("") if use_getpass else input())
+        if not use_getpass:
+            print("Received password.", file=sys.stderr)
     bot.register(args["-n"])
-    bot.join(args["<channel>"])
 
+    if args["--check-id"] or args["--force-id"]:
+        bot.send_raw("CAP", ["REQ", "account-notify"])
+        bot.send_raw("CAP", ["END"])
+
+    bot.join(args["<channel>"])
     t = threading.Thread(target=command_loop, args=[bot])
     t.daemon = True
     t.start()
 
     try:
         bot.listen()
-    except KeyboardInterrupt:
-        return
     finally:
-        bot.save_prefs()
+        bot.save_users()
         bot.save_mentions()
     print("Disconnected from server.")
 

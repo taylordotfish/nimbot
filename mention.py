@@ -28,15 +28,16 @@ class Mention:
         self.private = private
 
     def to_string(self, offset=0):
-        return "{0} {1} {2} {3} {4} {5}".format(
+        return " ".join(map(str, [
               self.time.strftime("%Y-%m-%d/%H:%M:%S"), self.index - offset,
-              self.private, self.sender, self.target, self.message)
+              self.private, self.sender, self.target, self.message]))
 
     @classmethod
-    def from_string(cls, string):
+    def from_string(cls, string, users):
         split = string.rstrip().split(" ", 5)
         time = datetime.strptime(split[0], "%Y-%m-%d/%H:%M:%S")
         index = int(split[1])
         private = split[2] == "True"
-        sender, target, message = split[3:]
+        sender, target = map(users.__getitem__, split[3:5])
+        message = split[5]
         return cls(message, sender, target, index, time, private)
