@@ -1,18 +1,18 @@
 nimbot
 ======
 
-Version 0.1.0
+Version 0.1.1
 
 **nimbot** is a Non-Intrusive Mailbot for IRC. It notifies users when they're
 mentioned in an IRC channel, but without spamming the channel. In fact, it
 doesn't talk in the channel at all. Communication with the bot is done only
 through private queries, and it can be enabled or disabled on a per-user basis.
 
-To send mail with nimbot, start your message with "[nickname]:". You can
+To send mail with nimbot, start your message with `<nickname>:`. You can
 specify multiple nicknames, separated by commas or colons. For example:
-* nickname: Message.
-* nickname1, nickname2: Message.
-* nickname1: nickname2: Message.
+* `nickname: Message.`
+* `nickname1, nickname2: Message.`
+* `nickname1: nickname2: Message.`
 
 nimbot can be enabled or disabled for each user with the command `/msg nimbot
 (enable|disable)`. It is enabled by default for all users. For more information
