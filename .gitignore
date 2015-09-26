@@ -57,5 +57,5 @@ docs/_build/
 target/
 
 # Config files
-prefs
-saved_mentions
+/saved-users
+/saved-mentions
