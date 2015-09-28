@@ -47,7 +47,7 @@ import re
 import sys
 import threading
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 # If modified, replace the source URL with one to the modified version.
 help_message = """\
@@ -248,10 +248,11 @@ class Nimbot(IRCBot):
             self.on_identified(user)
 
     def on_identified(self, user):
-        user.valid = True
-        if user.enabled and user.deliver_on_id:
-            self.deliver(user.nickname, user.mentions)
-            user.clear_mentions()
+        if user.nickname in self.nicklist[self.channels[0]]:
+            user.valid = True
+            if user.enabled and user.deliver_on_id:
+                self.deliver(user.nickname, user.mentions)
+                user.clear_mentions()
 
     def on_notice(self, message, nickname, channel, is_query):
         if nickname != "NickServ":
