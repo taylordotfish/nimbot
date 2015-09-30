@@ -26,7 +26,6 @@ class User:
         self.identified = False
         self.id_pending = False
         self.mentions = []
-        self.validate_on_id = True
         self.deliver_on_id = True
         self.id_callback = None
 

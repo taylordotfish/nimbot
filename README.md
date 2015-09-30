@@ -1,7 +1,7 @@
 nimbot
 ======
 
-Version 0.1.2
+Version 0.1.3
 
 **nimbot** is a non-intrusive mailbot for IRC. It notifies users when they're
 mentioned in an IRC channel, but without spamming the channel. In fact, it

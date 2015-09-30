@@ -31,6 +31,7 @@ Options:
   --password       Set a connection password. Can be used to identify
                    with NickServ. Uses getpass() if stdin is a TTY.
   --getpass        Force password to be read with getpass().
+  --loop           Restart if disconnected from the IRC server.
   --ssl            Use SSL/TLS to connect to the IRC server.
   --cafile=<file>  Use the specified list of CA root certificates to
                    verify the IRC server's certificate.
@@ -47,7 +48,7 @@ import re
 import sys
 import threading
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 # If modified, replace the source URL with one to the modified version.
 help_message = """\
@@ -345,18 +346,12 @@ def command_loop(bot):
             print('Type "users" or "mentions".', file=sys.stderr)
 
 
-def main():
-    args = docopt(__doc__, version=__version__)
-    bot = Nimbot(args["--check-id"], args["--force-id"])
-    bot.connect(args["<host>"], int(args["<port>"]), use_ssl=args["--ssl"],
-                ca_certs=args["--cafile"])
+def start(bot, args, password):
+    bot.connect(args["<host>"], int(args["<port>"]),
+                use_ssl=args["--ssl"], ca_certs=args["--cafile"])
 
-    if args["--password"]:
-        print("Password: ", end="", file=sys.stderr, flush=True)
-        use_getpass = sys.stdin.isatty() or args["--getpass"]
-        bot.password(getpass("") if use_getpass else input())
-        if not use_getpass:
-            print("Received password.", file=sys.stderr)
+    if password:
+        bot.password(password)
     bot.register(args["-n"])
 
     if args["--check-id"] or args["--force-id"]:
@@ -364,16 +359,32 @@ def main():
         bot.send_raw("CAP", ["END"])
 
     bot.join(args["<channel>"])
+    bot.listen()
+    print("Disconnected from server.")
+
+
+def main():
+    args = docopt(__doc__, version=__version__)
+    password = None
+    if args["--password"]:
+        print("Password: ", end="", file=sys.stderr, flush=True)
+        use_getpass = sys.stdin.isatty() or args["--getpass"]
+        password = getpass("") if use_getpass else input()
+        if not use_getpass:
+            print("Received password.", file=sys.stderr)
+
+    bot = Nimbot(args["--check-id"], args["--force-id"])
     t = threading.Thread(target=command_loop, args=[bot])
     t.daemon = True
     t.start()
 
     try:
-        bot.listen()
+        start(bot, args, password)
+        while args["--loop"]:
+            start(bot, args, password)
     finally:
         bot.save_users()
         bot.save_mentions()
-    print("Disconnected from server.")
 
 if __name__ == "__main__":
     main()
