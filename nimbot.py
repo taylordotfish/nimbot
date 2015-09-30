@@ -48,7 +48,7 @@ import re
 import sys
 import threading
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 # If modified, replace the source URL with one to the modified version.
 help_message = """\
@@ -336,7 +336,10 @@ class Nimbot(IRCBot):
 
 def command_loop(bot):
     while True:
-        command = input()
+        try:
+            command = input()
+        except EOFError:
+            break
         if command == "users":
             bot.print_users()
         elif command == "mentions":
