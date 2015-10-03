@@ -33,8 +33,9 @@ Options:
   --getpass        Force password to be read with getpass().
   --loop           Restart if disconnected from the IRC server.
   --ssl            Use SSL/TLS to connect to the IRC server.
-  --cafile=<file>  Use the specified list of CA root certificates to
-                   verify the IRC server's certificate.
+  --cafile <file>  Use the specified list of CA root certificates to verify
+                   the IRC server's certificate. System CA certificates will
+                   be used if not provided.
 """
 from pyrcb import IRCBot, IStr
 from mention import Mention
@@ -48,7 +49,7 @@ import re
 import sys
 import threading
 
-__version__ = "0.1.5"
+__version__ = "0.1.6"
 
 # If modified, replace the source URL with one to the modified version.
 help_message = """\
