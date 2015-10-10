@@ -47,7 +47,7 @@ import re
 import sys
 import threading
 
-__version__ = "0.1.7"
+__version__ = "0.1.8"
 
 # If modified, replace the source URL with one to the modified version.
 help_message = """\
@@ -178,7 +178,6 @@ class Nimbot(IRCBot):
 
         sender = self.users[nickname]
         self.msg_index += 1
-        mentioned = []
         print("[{3}] [{0}] <{1}> {2}".format(
             channel, nickname, message, datetime.now().replace(microsecond=0)))
 
@@ -192,14 +191,15 @@ class Nimbot(IRCBot):
                     message, sender, user, self.msg_index, datetime.now()))
 
         if mentioned_users:
-            print("[mentioned] {0}".format(", ".join(map(str, mentioned))))
+            print("[mentioned] {0}".format(
+                ", ".join(map(str, mentioned_users))))
         if not sender.enabled:
             return
 
         mentions = []
         for mention in sender.mentions:
             is_old = self.msg_index - mention.index > 50
-            has_reply = mention.sender in mentioned
+            has_reply = mention.sender in mentioned_users
             new_msg_exists = any(
                 self.msg_index - m.index < 40 and
                 m.sender == mention.sender for m in sender.mentions)
