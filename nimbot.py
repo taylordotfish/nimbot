@@ -47,7 +47,7 @@ import re
 import sys
 import threading
 
-__version__ = "0.1.6"
+__version__ = "0.1.7"
 
 # If modified, replace the source URL with one to the modified version.
 help_message = """\
@@ -182,18 +182,16 @@ class Nimbot(IRCBot):
         print("[{3}] [{0}] <{1}> {2}".format(
             channel, nickname, message, datetime.now().replace(microsecond=0)))
 
-        for user in self.users.values():
-            if not user.enabled or user == sender:
-                continue
-            # Check if user is mentioned.
-            is_mentioned = re.match(r"([^:, ]+[:,] ?)*{0}[:,]".format(
-                re.escape(user.nickname)), message, re.I)
-            if is_mentioned:
+        mentioned_users = filter(None, (
+            self.users.get(n.strip(":,")) for n in
+            re.match(r"([^:, ]+[:,] ?)*", message).group(0).split()))
+
+        for user in mentioned_users:
+            if user.enabled and user != sender:
                 user.mentions.append(Mention(
                     message, sender, user, self.msg_index, datetime.now()))
-                mentioned.append(user)
 
-        if mentioned:
+        if mentioned_users:
             print("[mentioned] {0}".format(", ".join(map(str, mentioned))))
         if not sender.enabled:
             return
@@ -202,9 +200,9 @@ class Nimbot(IRCBot):
         for mention in sender.mentions:
             is_old = self.msg_index - mention.index > 50
             has_reply = mention.sender in mentioned
-            new_msg_exists = any(self.msg_index - m.index < 40 and
-                                 m.sender == mention.sender
-                                 for m in sender.mentions)
+            new_msg_exists = any(
+                self.msg_index - m.index < 40 and
+                m.sender == mention.sender for m in sender.mentions)
             if is_old and (not has_reply or new_msg_exists):
                 mentions.append(mention)
 
