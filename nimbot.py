@@ -47,7 +47,7 @@ import re
 import sys
 import threading
 
-__version__ = "0.1.8"
+__version__ = "0.1.9"
 
 # If modified, replace the source URL with one to the modified version.
 help_message = """\
@@ -181,9 +181,9 @@ class Nimbot(IRCBot):
         print("[{3}] [{0}] <{1}> {2}".format(
             channel, nickname, message, datetime.now().replace(microsecond=0)))
 
-        mentioned_users = filter(None, (
+        mentioned_users = list(filter(None, (
             self.users.get(n.strip(":,")) for n in
-            re.match(r"([^:, ]+[:,] ?)*", message).group(0).split()))
+            re.match(r"([^:, ]+[:,] ?)*", message).group(0).split())))
 
         for user in mentioned_users:
             if user.enabled and user != sender:
