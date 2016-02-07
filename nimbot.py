@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (C) 2015 taylor.fish (https://github.com/taylordotfish)
+# Copyright (C) 2015-2016 taylor.fish <contact@taylor.fish>
 #
 # This file is part of nimbot.
 #
@@ -36,8 +36,7 @@ Options:
                    be used if not provided.
 """
 from pyrcb import IRCBot, IStr
-from mention import Mention
-from user import User, Users
+from mention import Mention, User, Users
 from docopt import docopt
 from humanize import naturaltime
 from datetime import datetime
@@ -47,16 +46,16 @@ import re
 import sys
 import threading
 
-__version__ = "0.1.9"
+__version__ = "0.1.10"
 
 # If modified, replace the source URL with one to the modified version.
-help_message = """\
+HELP_MESSAGE = """\
 nimbot: The Non-Intrusive Mailbot. (v{0})
 Source: https://github.com/taylordotfish/nimbot (AGPLv3 or later)
 To send mail, begin your message with "<nickname>:".
 You can specify multiple nicknames, separated by commas or colons.
 nimbot is {{0}}.
-Usage:
+Commands:
   help     Show this help message.
   check    Manually check for mail.
   clear    Clear mail without reading.
@@ -67,14 +66,16 @@ Usage:
            Usage: send <nickname> <message>
 """.format(__version__)
 
-script_dir = os.path.dirname(os.path.realpath(__file__))
-users_path = os.path.join(script_dir, "saved-users")
-mentions_path = os.path.join(script_dir, "saved-mentions")
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+USERS_PATH = os.path.join(SCRIPT_DIR, "saved-users")
+MENTIONS_PATH = os.path.join(SCRIPT_DIR, "saved-mentions")
 
 
 class Nimbot(IRCBot):
     def __init__(self, check_id, force_id, **kwargs):
         super(Nimbot, self).__init__(**kwargs)
+        self.register_event(self.on_account, "ACCOUNT")
+
         self.check_id = check_id
         self.force_id = force_id
         self.msg_index = 0
@@ -92,11 +93,11 @@ class Nimbot(IRCBot):
             if mention.private:
                 message = "[private] " + message
             self.send(nickname, message)
-            print("[deliver -> {0}] {1}".format(nickname, message))
+            log("[deliver -> {0}] {1}".format(nickname, message))
 
     def on_query(self, message, nickname):
         def help():
-            response = help_message.format(
+            response = HELP_MESSAGE.format(
                 ["disabled", "enabled"][user.enabled])
             for line in response.splitlines():
                 self.send(nickname, line)
@@ -131,11 +132,13 @@ class Nimbot(IRCBot):
 
             target_nick, msg = args
             if target_nick not in self.users:
-                self.send(nickname, "You can only send private messages "
-                                    "to users nimbot is aware of.")
+                self.send(nickname, (
+                    "You can only send private messages to "
+                    "users nimbot is aware of."))
             elif target_nick in self.nicklist[self.channels[0]]:
-                self.send(nickname, "{0} is online. Send them a regular "
-                                    "private message.".format(target_nick))
+                self.send(nickname, (
+                    "{0} is online. Send them a regular "
+                    "private message.".format(target_nick)))
             else:
                 target = self.users[target_nick]
                 target.mentions.append(Mention(
@@ -147,8 +150,7 @@ class Nimbot(IRCBot):
 
         command = IStr(message.split(" ", 1)[0])
         user = self.users[nickname]
-        print("[{2}] [query] <{0}> {1}".format(
-            nickname, message, datetime.now().replace(microsecond=0)))
+        log("[query] <{0}> {1}".format(nickname, message))
 
         # Dispatch command to the appropriate function,
         # or other() if not found.
@@ -158,18 +160,20 @@ class Nimbot(IRCBot):
         }.get(command, other)
 
         if nickname not in self.nicklist[self.channels[0]]:
-            self.send(nickname, "Please join the channel monitored "
-                                "by nimbot first.")
+            self.send(nickname, (
+                "Please join the channel monitored by nimbot first."))
         elif user.id_pending:
-            self.send(nickname, "Your nickname is being identified. "
-                                "Please try again in a few seconds.")
+            self.send(nickname, (
+                "Your nickname is being identified. "
+                "Please try again in a few seconds."))
         elif not user.identified:
-            self.send(nickname, "Please identify with NickServ to use nimbot.")
+            self.send(nickname, (
+                "Please identify with NickServ to use nimbot."))
         else:
             function()
             if user.mentions:
-                self.send(nickname, "You have unread messages. "
-                                    'Type "check" to read.')
+                self.send(nickname, (
+                    'You have unread messages. Type "check" to read.'))
 
     def on_message(self, message, nickname, channel, is_query):
         if is_query:
@@ -178,8 +182,7 @@ class Nimbot(IRCBot):
 
         sender = self.users[nickname]
         self.msg_index += 1
-        print("[{3}] [{0}] <{1}> {2}".format(
-            channel, nickname, message, datetime.now().replace(microsecond=0)))
+        log("[{0}] <{1}> {2}".format(channel, nickname, message))
 
         mentioned_users = list(filter(None, (
             self.users.get(n.strip(":,")) for n in
@@ -191,8 +194,7 @@ class Nimbot(IRCBot):
                     message, sender, user, self.msg_index, datetime.now()))
 
         if mentioned_users:
-            print("[mentioned] {0}".format(
-                ", ".join(map(str, mentioned_users))))
+            log("[mentioned] {0}".format(", ".join(map(str, mentioned_users))))
         if not sender.enabled:
             return
 
@@ -236,7 +238,7 @@ class Nimbot(IRCBot):
         if self.check_id or self.force_id:
             user.id_pending = True
             user.identified = False
-            print("Identifying {0}...".format(nickname))
+            log("Identifying {0}...".format(nickname))
             if self.use_acc:
                 self.send("NickServ", "ACC {0} {0}".format(nickname))
             if self.use_status:
@@ -258,13 +260,13 @@ class Nimbot(IRCBot):
 
         match = None
         if self.use_acc:
-            match = re.match("([^ ]*) -> [^ ]* ACC (\d)", message)
+            match = re.match(r"([^ ]*) -> [^ ]* ACC (\d)", message)
             if match:
                 self.use_status = False
                 nick, status = match.groups()
 
         if self.use_status:
-            match = re.match("STATUS ([^ ]*) (\d) ([^ ]*)", message)
+            match = re.match(r"STATUS ([^ ]*) (\d) ([^ ]*)", message)
             if match:
                 self.use_acc = False
                 nick, status, account = match.groups()
@@ -278,15 +280,14 @@ class Nimbot(IRCBot):
             user.id_pending = False
 
             id_str = "identified" if user.identified else "not identified"
-            print("{0} {1}. (ACC/STATUS {2})".format(nick, id_str, status))
+            log("{0} {1}. (ACC/STATUS {2})".format(nick, id_str, status))
             if user.identified:
                 self.on_identified(user)
             user.deliver_on_id = True
 
-    def on_raw(self, nickname, command, args):
-        if command == "ACCOUNT":
-            print("Account status for {0} changed.".format(nickname))
-            self.identify(nickname)
+    def on_account(self, nickname, *args):
+        log("Account status for {0} changed.".format(nickname))
+        self.identify(nickname)
 
     # ===========
     # Preferences
@@ -305,27 +306,27 @@ class Nimbot(IRCBot):
             print(mention.to_string(offset), file=file)
 
     def save_users(self):
-        with open(users_path, "w") as f:
+        with open(USERS_PATH, "w") as f:
             print("# <nickname> <enabled (True/False)>", file=f)
             self.print_users(file=f)
 
     def save_mentions(self):
-        with open(mentions_path, "w") as f:
+        with open(MENTIONS_PATH, "w") as f:
             self.print_mentions(file=f)
 
     def read_users(self):
-        if not os.path.isfile(users_path):
+        if not os.path.isfile(USERS_PATH):
             return
-        with open(users_path) as f:
+        with open(USERS_PATH) as f:
             for line in f:
                 if not line.startswith("#"):
                     user = User.from_string(line.rstrip())
                     self.users[user.nickname] = user
 
     def read_mentions(self):
-        if not os.path.isfile(mentions_path):
+        if not os.path.isfile(MENTIONS_PATH):
             return
-        with open(mentions_path) as f:
+        with open(MENTIONS_PATH) as f:
             for line in f:
                 mention = Mention.from_string(line, self.users)
                 mention.target.mentions.append(mention)
@@ -342,13 +343,22 @@ def command_loop(bot):
         elif command == "mentions":
             bot.print_mentions()
         else:
-            print("Unknown command.", file=sys.stderr)
-            print('Type "users" or "mentions".', file=sys.stderr)
+            stderr("Unknown command.")
+            stderr('Type "users" or "mentions".')
+
+
+def stderr(*args, **kwargs):
+    print(*args, **kwargs, file=sys.stderr)
+
+
+def log(*args, **kwargs):
+    print(datetime.now().strftime("[%Y-%m-%d %H:%M:%S]"), *args, **kwargs)
 
 
 def start(bot, args, password):
-    bot.connect(args["<host>"], int(args["<port>"]),
-                use_ssl=args["--ssl"], ca_certs=args["--cafile"])
+    bot.connect(
+        args["<host>"], int(args["<port>"]),
+        use_ssl=args["--ssl"], ca_certs=args["--cafile"])
 
     if password:
         bot.password(password)
@@ -367,11 +377,11 @@ def main():
     args = docopt(__doc__, version=__version__)
     password = None
     if args["--password"]:
-        print("Password: ", end="", file=sys.stderr, flush=True)
+        stderr("Password: ", end="", flush=True)
         use_getpass = sys.stdin.isatty() or args["--getpass"]
         password = getpass("") if use_getpass else input()
         if not use_getpass:
-            print("Received password.", file=sys.stderr)
+            stderr("Received password.")
 
     bot = Nimbot(args["--check-id"], args["--force-id"])
     t = threading.Thread(target=command_loop, args=[bot])
