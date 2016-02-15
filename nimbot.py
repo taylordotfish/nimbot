@@ -46,24 +46,24 @@ import re
 import sys
 import threading
 
-__version__ = "0.1.11"
+__version__ = "0.2.0"
 
 # If modified, replace the source URL with one to the modified version.
 HELP_MESSAGE = """\
 nimbot: The Non-Intrusive Mailbot. (v{0})
 Source: https://github.com/taylordotfish/nimbot (AGPLv3 or later)
 To send mail, begin your message with "<nickname>:".
-You can specify multiple nicknames, separated by commas or colons.
+You can specify multiple nicknames separated by commas or colons.
 nimbot is {{0}}.
 Commands:
-  help     Show this help message.
-  check    Manually check for mail.
-  clear    Clear mail without reading.
-  enable   Enable nimbot.
-  disable  Disable nimbot. You'll still receive private
-           messages sent when you're offline.
-  send     Send a private message.
-           Usage: send <nickname> <message>
+  help: Show this help message.
+  check: Manually check for mail.
+  clear: Clear mail without reading.
+  enable: Enable nimbot.
+  disable: Disable nimbot. You'll still receive
+    private messages sent when you're offline.
+  send <nickname> <message>: Send a private message.
+  enabled? <nickname>: Check if a user has nimbot enabled.
 """.format(__version__)
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -80,6 +80,13 @@ class Nimbot(IRCBot):
         self.force_id = force_id
         self.msg_index = 0
         self.users = Users()
+
+        # If more than this number of messages are after
+        # a given message, the message is considered old.
+        self.old_message = 50
+        # If fewer than this number of messages are after
+        # a given message, the message is considered new.
+        self.new_message = 40
 
         self.use_acc = True
         self.use_status = True
@@ -129,7 +136,6 @@ class Nimbot(IRCBot):
             if len(args) < 2:
                 other()
                 return
-
             target_nick, msg = args
             if target_nick not in self.users:
                 self.send(nickname, (
@@ -145,6 +151,19 @@ class Nimbot(IRCBot):
                     msg, user, target, 0, datetime.now(), private=True))
                 self.send(nickname, "Message sent.")
 
+        def enabled():
+            args = message.split(" ", 1)[1:]
+            if len(args) < 1:
+                other()
+                return
+            nick = args[0]
+            if nick not in self.users:
+                self.send(nickname, "nimbot is not aware of that user.")
+                return
+            user = self.users[nick]
+            state = ["disabled", "enabled"][user.enabled]
+            self.send(nickname, "{0} has nimbot {1}.".format(nick, state))
+
         def other():
             self.send(nickname, 'Type "help" for help.')
 
@@ -152,28 +171,34 @@ class Nimbot(IRCBot):
         user = self.users[nickname]
         log("[query] <{0}> {1}".format(nickname, message))
 
+        error = None
+        if nickname not in self.nicklist[self.channels[0]]:
+            error = "Please join the channel monitored by nimbot first."
+        elif user.id_pending:
+            error = "Your nickname is being identified. Please try "\
+                    "again in a few seconds."
+        elif not user.identified:
+            error = "Please identify with NickServ to use nimbot."
+
+        if error:
+            self.send(nickname, error)
+            return
+
         # Dispatch command to the appropriate function,
         # or other() if not found.
-        function = {
-            "help": help, "check": check, "clear": clear,
-            "enable": enable, "disable": disable, "send": send
-        }.get(command, other)
+        function, nargs = {
+            "help": (help, 0), "check": (check, 0), "clear": (clear, 0),
+            "enable": (enable, 0), "disable": (disable, 0), "send": (send, 2),
+            "enabled?": (enabled, 1)
+        }.get(command, (other, 0))
 
-        if nickname not in self.nicklist[self.channels[0]]:
+        args = message.split(" ", nargs)[1:]
+        if len(args) < nargs:
+            function = other
+        function()
+        if user.mentions:
             self.send(nickname, (
-                "Please join the channel monitored by nimbot first."))
-        elif user.id_pending:
-            self.send(nickname, (
-                "Your nickname is being identified. "
-                "Please try again in a few seconds."))
-        elif not user.identified:
-            self.send(nickname, (
-                "Please identify with NickServ to use nimbot."))
-        else:
-            function()
-            if user.mentions:
-                self.send(nickname, (
-                    'You have unread messages. Type "check" to read.'))
+                'You have unread messages. Type "check" to read.'))
 
     def on_message(self, message, nickname, channel, is_query):
         if is_query:
@@ -186,7 +211,7 @@ class Nimbot(IRCBot):
 
         mentioned_users = list(filter(None, (
             self.users.get(n.strip(":,")) for n in
-            re.match(r"([^:, ]+[:,] ?)*", message).group(0).split())))
+            re.match(r"([^:, ]+[:,] +)*", message).group(0).split())))
 
         for user in mentioned_users:
             if user.enabled and user != sender:
@@ -200,10 +225,10 @@ class Nimbot(IRCBot):
 
         mentions = []
         for mention in sender.mentions:
-            is_old = self.msg_index - mention.index > 50
+            is_old = self.msg_index - mention.index > self.old_message
             has_reply = mention.sender in mentioned_users
             new_msg_exists = any(
-                self.msg_index - m.index < 40 and
+                self.msg_index - m.index < self.new_message and
                 m.sender == mention.sender for m in sender.mentions)
             if is_old and (not has_reply or new_msg_exists):
                 mentions.append(mention)
@@ -339,12 +364,13 @@ def command_loop(bot):
         except EOFError:
             break
         if command == "users":
+            stderr("<nickname> <enabled>")
             bot.print_users()
         elif command == "mentions":
+            stderr("<date> <offset> <private> <sender> <target> <message>")
             bot.print_mentions()
         else:
-            stderr("Unknown command.")
-            stderr('Type "users" or "mentions".')
+            stderr('Unknown command. Type "users" or "mentions".')
 
 
 def stderr(*args, **kwargs):
