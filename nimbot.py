@@ -399,8 +399,8 @@ def start(bot, args, password):
     print("Disconnected from server.")
 
 
-def main():
-    args = docopt(__doc__, version=__version__)
+def main(argv):
+    args = docopt(__doc__, argv=argv[1:], version=__version__)
     password = None
     if args["--password"]:
         stderr("Password: ", end="", flush=True)
@@ -423,4 +423,4 @@ def main():
         bot.save_mentions()
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)
