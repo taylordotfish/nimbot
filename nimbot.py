@@ -46,13 +46,13 @@ import re
 import sys
 import threading
 
-__version__ = "0.2.9"
+__version__ = "0.2.10"
 
 # If modified, replace the source URL with one to the modified version.
 HELP_MESSAGE = """\
 nimbot: The Non-Intrusive Mailbot. (v{0})
 Source: https://github.com/taylordotfish/nimbot (AGPLv3 or later)
-To send mail, begin your message with "<nickname>:".
+To send mail, begin your message with "<nickname>: ".
 You can specify multiple nicknames separated by commas or colons.
 nimbot is {{0}}.
 Commands:
