@@ -46,7 +46,7 @@ import re
 import sys
 import threading
 
-__version__ = "0.2.12"
+__version__ = "0.2.13"
 
 # If modified, replace the source URL with one to the modified version.
 HELP_MESSAGE = """\
@@ -291,12 +291,10 @@ class Nimbot(IRCBot):
                 nick, status = match.groups()
 
         if self.use_status:
-            match = re.match(r"STATUS ([^ ]*) (\d) ([^ ]*)", message)
+            match = re.match(r"STATUS ([^ ]*) (\d)", message)
             if match:
                 self.use_acc = False
-                nick, status, account = match.groups()
-                if status == "3" and nick != account:
-                    status = "1"
+                nick, status = match.groups()
 
         if match:
             user = self.users[nick]
