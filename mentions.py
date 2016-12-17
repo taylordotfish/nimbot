@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with nimbot.  If not, see <http://www.gnu.org/licenses/>.
 
-from pyrcb import IStr, IDefaultDict
+from pyrcb2 import IStr, IDict
 from datetime import datetime
 
 
@@ -44,16 +44,21 @@ class Mention:
         return cls(message, sender, target, index, time, private)
 
 
-class User:
-    def __init__(self, nickname, enabled=True, valid=False):
+class MailUser:
+    def __init__(self, nickname, enabled=True):
         self.nickname = IStr(nickname)
         self.enabled = enabled
-        self.valid = valid
-        self.identified = False
-        self.id_pending = False
         self.mentions = []
-        self.deliver_on_id = True
-        self.id_callback = None
+        self.identified_below = 0
+        self._save = False
+
+    @property
+    def save(self):
+        return self._save or bool(self.mentions)
+
+    @save.setter
+    def save(self, value):
+        self._save = value
 
     def public_mentions(self):
         return (m for m in self.mentions if not m.private)
@@ -75,10 +80,12 @@ class User:
         split = string.split()
         nickname = IStr(split[0])
         enabled = (len(split) < 2 or split[1].lower() == "true")
-        return cls(nickname, enabled, valid=True)
+        user = cls(nickname, enabled)
+        user.save = True
+        return user
 
 
-class Users(IDefaultDict):
+class MailUserDict(IDict):
     def __missing__(self, key):
-        self[key] = User(key)
+        self[key] = MailUser(key)
         return self[key]

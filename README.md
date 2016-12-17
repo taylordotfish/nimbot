@@ -1,7 +1,7 @@
 nimbot
 ======
 
-Version 0.2.13
+Version 0.3.0
 
 **nimbot** is a non-intrusive mailbot (hence the name) for IRC. It notifies
 users when they're mentioned in an IRC channel, but without spamming the
@@ -11,6 +11,7 @@ a per-user basis.
 
 To send mail with nimbot, start your message with ``<nickname>:``. You can
 specify multiple nicknames, separated by commas or colons. For example:
+
 * ``nickname: Message.``
 * ``nickname1, nickname2: Message.``
 * ``nickname1: nickname2: Message.``
@@ -36,21 +37,16 @@ See ``nimbot --help`` for information on how to run it.
 What's new
 ----------
 
-Version 0.2.13:
+Version 0.3.0:
 
-* Improved account tracking for servers which use ``NickServ STATUS``.
-
-Version 0.2.10-0.2.12:
-
-* Updated pyrcb.
-
-Version 0.2.9
-
-* Fixed syntax errors with older versions of Python.
+* Switched to pyrcb2; now using pyrcb2's built-in account tracking.
+* Added command-line option ``--verbose``.
+* Improved help and error messages.
 
 Dependencies
 ------------
 
-* Python 3.3 or higher
-* [docopt 0.6.6 or higher](https://pypi.python.org/pypi/docopt)
-* [humanize 0.5.1 or higher](https://pypi.python.org/pypi/humanize)
+* Python ≥ 3.5
+* [pyrcb2](https://pypi.python.org/pypi/pyrcb2) ≥ 0.1.2
+* [docopt](https://pypi.python.org/pypi/docopt) ≥ 0.6.6
+* [humanize](https://pypi.python.org/pypi/humanize) ≥ 0.5.1
