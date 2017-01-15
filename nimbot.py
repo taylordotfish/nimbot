@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (C) 2015-2016 taylor.fish <contact@taylor.fish>
+# Copyright (C) 2015-2017 taylor.fish <contact@taylor.fish>
 #
 # This file is part of nimbot.
 #
@@ -44,7 +44,7 @@ import os
 import re
 import sys
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 # If modified, replace the source URL with one to the modified version.
 HELP_MESSAGE = """\
@@ -214,7 +214,7 @@ class Nimbot:
 
         if mentioned_users:
             log("[mentioned] %s" % ", ".join(map(str, mentioned_users)))
-        if not sender_user.enabled and sender in self.users[self.channel]:
+        if not sender_user.enabled and sender in self.bot.users[self.channel]:
             return
 
         identified = await self.identify_user(sender)

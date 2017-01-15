@@ -1,7 +1,7 @@
 nimbot
 ======
 
-Version 0.3.0
+Version 0.3.1
 
 **nimbot** is a non-intrusive mailbot (hence the name) for IRC. It notifies
 users when they're mentioned in an IRC channel, but without spamming the
@@ -36,6 +36,11 @@ See ``nimbot --help`` for information on how to run it.
 
 What's new
 ----------
+
+Version 0.3.1:
+
+* Fixed a bug that caused crashes when users with nimbot disabled mentioned
+  other users.
 
 Version 0.3.0:
 

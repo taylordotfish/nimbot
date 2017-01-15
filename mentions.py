@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2016 taylor.fish <contact@taylor.fish>
+# Copyright (C) 2015-2017 taylor.fish <contact@taylor.fish>
 #
 # This file is part of nimbot.
 #
