@@ -44,7 +44,7 @@ import os
 import re
 import sys
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 
 # If modified, replace the source URL with one to the modified version.
 HELP_MESSAGE = """\
@@ -90,10 +90,10 @@ class Nimbot:
 
         # If more than this number of messages are after
         # a given message, the message is considered old.
-        self.old_message = 7  # 50
+        self.old_message = 50
         # If fewer than this number of messages are after
         # a given message, the message is considered new.
-        self.new_message = 3  # 40
+        self.new_message = 40
 
         self.read_users()
         self.read_mentions()
