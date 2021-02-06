@@ -1,7 +1,7 @@
 nimbot
 ======
 
-Version 0.3.2
+Version 0.4.0
 
 **nimbot** is a non-intrusive mailbot (hence the name) for IRC. It notifies
 users when they're mentioned in an IRC channel, but without spamming the
@@ -37,6 +37,10 @@ See ``nimbot --help`` for information on how to run it.
 What's new
 ----------
 
+Version 0.4.0:
+
+* nimbot now works with (and requires) [pyrcb2] v0.6.
+
 Version 0.3.2:
 
 * Fixed "old message" and "new message" numbers (they were set to debug
@@ -56,7 +60,23 @@ Version 0.3.0:
 Dependencies
 ------------
 
-* Python ≥ 3.5
-* [pyrcb2](https://pypi.python.org/pypi/pyrcb2) ≥ 0.1.2
-* [docopt](https://pypi.python.org/pypi/docopt) ≥ 0.6.6
-* [humanize](https://pypi.python.org/pypi/humanize) ≥ 0.5.1
+* Python ≥ 3.7
+* Python package: [pyrcb2]
+* Python package: [aioconsole]
+* Python package: [docopt]
+* Python package: [humanize]
+
+Run ``pip3 install -r requirements.txt`` to install the Python packages. You
+can also use ``requirements.freeze.txt`` instead to install specific versions
+of the dependencies that have been verified to work.
+
+[pyrcb2]: https://pypi.org/project/pyrcb2
+[aioconsole]: https://pypiorg/project/aioconsole
+[docopt]: https://pypi.org/project/docopt
+[humanize]: https://pypi.org/project/humanize
+
+License
+-------
+
+nimbot is licensed under version 3 or later of the GNU Affero General Public
+License. See [LICENSE](LICENSE).

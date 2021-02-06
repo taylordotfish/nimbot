@@ -1,0 +1,4 @@
+pyrcb2==0.6.1
+aioconsole==0.3.1
+docopt==0.6.2
+humanize==3.2.0

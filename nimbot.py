@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (C) 2015-2017 taylor.fish <contact@taylor.fish>
+# Copyright (C) 2015-2017, 2021 taylor.fish <contact@taylor.fish>
 #
 # This file is part of nimbot.
 #
@@ -33,18 +33,20 @@ Options:
   -v --verbose     Display communication with the IRC server.
 """
 from mentions import Mention, MailUser
-from pyrcb2 import IRCBot, Event, event_decorator, Status, astdio
+from pyrcb2 import IRCBot, Event, event_decorator, Status
 import mentions
 
+from aioconsole import aprint, ainput
 from humanize import naturaltime
 from datetime import datetime
 from docopt import docopt
 from getpass import getpass
+import asyncio
 import os
 import re
 import sys
 
-__version__ = "0.3.2"
+__version__ = "0.4.0"
 
 # If modified, replace the source URL with one to the modified version.
 HELP_MESSAGE = """\
@@ -377,7 +379,7 @@ class Nimbot:
     async def command_loop(self):
         while True:
             try:
-                command = await astdio.input()
+                command = await ainput()
             except EOFError:
                 break
             text = "Commands: users, mentions"
@@ -393,23 +395,18 @@ class Nimbot:
                 ))
             await stderr_async(text)
 
-    async def start_async(self, hostname, port, ssl, nickname, password):
-        await self.bot.connect(hostname, port, ssl=ssl)
-        await self.bot.register(nickname, password=password)
-        if self.check_id:
-            if not self.bot.is_tracking_known_id_statuses:
-                raise RuntimeError(
-                    "The IRC server must support account-notify "
-                    "when using --check-id and --force-id.",
-                )
-        self.bot.join(self.channel)
-        await self.bot.listen()
-
-    def start(self, hostname, port, ssl, nickname, password):
-        self.bot.schedule_coroutine(self.command_loop())
-        self.bot.call_coroutine(
-            self.start_async(hostname, port, ssl, nickname, password),
-        )
+    async def run(self, hostname, port, ssl, nickname, password):
+        async def init():
+            await self.bot.connect(hostname, port, ssl=ssl)
+            await self.bot.register(nickname, password=password)
+            if self.check_id:
+                if not self.bot.is_tracking_known_id_statuses:
+                    raise RuntimeError(
+                        "The IRC server must support account-notify "
+                        "when using --check-id and --force-id.",
+                    )
+            await self.bot.join(self.channel)
+        await self.bot.run(asyncio.gather(self.command_loop(), init()))
 
 
 def stderr(*args, **kwargs):
@@ -417,7 +414,7 @@ def stderr(*args, **kwargs):
 
 
 async def stderr_async(*args, **kwargs):
-    await astdio.print(*args, file=sys.stderr, **kwargs)
+    await aprint(*args, use_stderr=True, **kwargs)
 
 
 def log(*args, **kwargs):
@@ -435,21 +432,25 @@ def main(argv):
         if not use_getpass:
             stderr("Received password.")
 
-    nimbot = Nimbot(
-        args["--check-id"], args["--force-id"], args["<channel>"],
-        log_communication=args["--verbose"],
-    )
+    run_args = (
+        args["<host>"], int(args["<port>"]), args["--ssl"],
+        args["<nickname>"], password)
 
-    try:
-        start_args = [
-            args["<host>"], int(args["<port>"]), args["--ssl"],
-            args["<nickname>"], password]
-        nimbot.start(*start_args)
-        while args["--loop"]:
-            nimbot.start(*start_args)
-    finally:
-        nimbot.save_users()
-        nimbot.save_mentions()
+    async def run():
+        nimbot = Nimbot(
+            args["--check-id"], args["--force-id"], args["<channel>"],
+            log_communication=args["--verbose"],
+        )
+        try:
+            await nimbot.run(*run_args)
+        finally:
+            nimbot.save_users()
+            nimbot.save_mentions()
+
+    asyncio.run(run())
+    while args["--loop"]:
+        asyncio.run(run())
+
 
 if __name__ == "__main__":
     main(sys.argv)
